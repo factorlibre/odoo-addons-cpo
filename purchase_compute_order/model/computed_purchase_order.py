@@ -395,7 +395,8 @@ class ComputedPurchaseOrder(models.Model):
                         'package_quantity': psi and (
                             psi[0].package_qty or psi[0].min_qty) or 1.0,
                         'average_consumption': pp.average_consumption,
-                        'uom_po_id': psi.product_uom.id,
+                        'uom_po_id':
+                            psi and psi[0].product_uom.id or pp.uom_po_id.id,
                     }))
                     cpol_product_ids.append(pp.id)
             # update line_ids
