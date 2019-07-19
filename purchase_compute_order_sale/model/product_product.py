@@ -26,15 +26,19 @@ from openerp import models, api
 class ProductProduct(models.Model):
     _inherit = 'product.product'
 
+    def _get_draft_sol_domain(self):
+        return [
+            ('state', '=', 'draft'),
+            ('product_id', 'in', map(lambda p: p.id, self))
+        ]
+
     # Private section
     @api.multi
     def _get_draft_outgoing_qty(self):
         super(ProductProduct, self)._get_draft_outgoing_qty()
         sol_obj = self.env['sale.order.line']
-        sol_ids = sol_obj.search([
-            ('state', '=', 'draft'),
-            ('product_id', 'in', map(lambda p: p.id, self))
-        ])
+        sol_domain = self._get_draft_sol_domain()
+        sol_ids = sol_obj.search(sol_domain)
         draft_qty = {}
         for line in sol_ids:
             draft_qty.setdefault(line.product_id.id, 0)
