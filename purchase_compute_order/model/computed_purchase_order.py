@@ -341,14 +341,16 @@ class ComputedPurchaseOrder(models.Model):
     @api.multi
     def _active_product_stock_product_domain(self, psi_ids):
         self.ensure_one()
-        self.env.cr.execute("""
-            SELECT product_tmpl_id
-            FROM product_supplierinfo
-            WHERE id in %s
-              AND product_tmpl_id is not null
-        """, (tuple(psi_ids),))
-        result = self.env.cr.fetchall()
-        tmpl_ids = map(lambda r: r[0], result)
+        tmpl_ids = []
+        if psi_ids:
+            self.env.cr.execute("""
+                SELECT product_tmpl_id
+                FROM product_supplierinfo
+                WHERE id in %s
+                  AND product_tmpl_id is not null
+            """, (tuple(psi_ids),))
+            result = self.env.cr.fetchall()
+            tmpl_ids = map(lambda r: r[0], result)
         product_domain = [
             ('product_tmpl_id', 'in', tmpl_ids),
             ('state', 'not in', ('end', 'obsolete'))

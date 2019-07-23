@@ -55,7 +55,6 @@ class ProductProduct(models.Model):
 
     @api.multi
     def _average_consumption(self):
-        self.refresh()
         product_ids = map(lambda p: p.id, self)
         first_date = time.strftime('%Y-%m-%d')
         begin_date = (
@@ -90,4 +89,3 @@ class ProductProduct(models.Model):
                 nb_days and qty_out / nb_days or 0.0)
             product.total_consumption = qty_out or 0.0
             product.nb_days = nb_days or 0.0
-        return True
