@@ -14,15 +14,18 @@ class ProductProduct(models.Model):
             datetime.datetime.today() -
             datetime.timedelta(days=n_days)).strftime('%Y-%m-%d')
         ctx = dict(self.env.context)
-        ctx.update({
-            'from_date': begin_date
-        })
+        if ctx.get('from_date') and ctx.get('force_from_date'):
+            begin_date = ctx['from_date']
+        else:
+            ctx.update({
+                'from_date': begin_date
+            })
         domain_products = [('product_id', 'in', product_ids)]
         domain_move_out = []
-        domain_quant_loc, domain_move_in_loc, domain_move_out_loc = \
-            self._get_domain_locations()
+        domain_location = self._get_average_consumption_location_domain()
+        domain_states = self._get_average_consumption_states_domain()
         domain_move_out += self._get_domain_dates(ctx) \
-            + [('state', 'in', ('confirmed', 'waiting', 'assigned', 'done'))] \
+            + domain_states \
             + domain_products
         rules = self.env['consumption.rules'].search([
             ('apply_to_calculation', '=', True)
@@ -33,7 +36,7 @@ class ProductProduct(models.Model):
                                 '&', ('date', '>=', rules.initial_date),
                                 ('date', '<', rules.end_date), '&']
             domain_move_out += alternate_domain
-        domain_move_out += domain_move_out_loc
+        domain_move_out += domain_location
         return domain_move_out, begin_date, ctx
 
     # Prototipo para calculo con fehcas mayores a 365
