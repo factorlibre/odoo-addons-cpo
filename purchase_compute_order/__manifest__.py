@@ -34,6 +34,7 @@
         'product_average_consumption',
         'product',
         'purchase',
+        'queue_job',
     ],
     'data': [
         'data/ir_sequence.xml',
