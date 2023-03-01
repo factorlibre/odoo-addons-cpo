@@ -42,17 +42,14 @@ class ProductProduct(models.Model):
         begin_date = (datetime.datetime.today() -
                       datetime.timedelta(days=365)).strftime('%Y-%m-%d')
         date = max(begin_date, self._min_date_draft())
-        sale_ids = []
-        if True in pvi:
-            sale_ids += self.env['sale.order'].search([
-                ('date_order', '>=', date),
-                ('initial_order', '=', True)
-            ]).ids
-        if False in pvi:
-            sale_ids += self.env['sale.order'].search([
-                ('date_order', '>=', date),
-                ('initial_order', '=', False)
-            ]).ids
+        order_domain = [('date_order', '>=', date)]
+
+        if False in pvi and not True in pvi:
+            order_domain.append(('initial_order', '=', False))
+        elif True in pvi and not False in pvi:
+            order_domain.append(('initial_order', '=', True))
+
+        sale_ids = self.env['sale.order'].search(order_domain)
         domain = self._get_average_consumption_domain(parametres, sale_ids)
         line_ids = self.env['sale.order.line'].search(domain)
         consumption = 0
@@ -106,9 +103,12 @@ class ProductProduct(models.Model):
 
     @api.multi
     def _get_average_consumption_domain(self, parametres, sale_ids):
-        sale_ids = self.env['sale.order'].search([
-            ('id', 'in', sale_ids),
-            ('state', 'in', parametres),
-        ]).ids
+        change_format = False
+        if not isinstance(sale_ids, self.env['sale.order']):
+            sale_ids = self.env['sale.order'].browse(sale_ids)
+            change_format = True
+        sale_ids = sale_ids.filtered(lambda o: o.state in parametres)
+        if change_format:
+            sale_ids = sale_ids.ids
         return [('order_id', 'in', sale_ids),
                 ('product_id', '=', self.id)]
