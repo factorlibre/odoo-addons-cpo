@@ -104,7 +104,7 @@ class ProductProduct(models.Model):
     @api.multi
     def _get_average_consumption_domain(self, parametres, sale_ids):
         change_format = False
-        if not isinstance(sale_ids, self.env['sale.order']):
+        if not isinstance(sale_ids, models.Model):
             sale_ids = self.env['sale.order'].browse(sale_ids)
             change_format = True
         sale_ids = sale_ids.filtered(lambda o: o.state in parametres)
