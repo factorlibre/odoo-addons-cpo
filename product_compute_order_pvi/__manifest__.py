@@ -1,8 +1,7 @@
-# License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 # © 2018 FactorLibre - Álvaro Marcos <alvaro.marcos@factorlibre.com>
 {
     'name': 'Product - Average Consumption PVI',
-    'version': '11.0.1.0.0',
+    'version': '11.0.1.0.1',
     'category': 'Purchase',
     'author': 'FactorLibre',
     'license': 'AGPL-3',

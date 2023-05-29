@@ -52,9 +52,9 @@ class ComputedPurchaseOrderLine(models.Model):
                 computed_qty += (cpol.draft_incoming_qty -
                                  cpol.draft_outgoing_qty)
             if cpol.computed_purchase_order_id.compute_pvi_d_quantity:
-                computed_qty -= cpol.pvi_draft_qty
+                computed_qty -= cpol_lines.get(cpol.id, {}).get('pvi_draft_qty')
             if cpol.computed_purchase_order_id.compute_pvi_quantity:
-                computed_qty -= cpol.pvi_qty
+                computed_qty -= cpol_lines.get(cpol.id, {}).get('pvi_qty')
             values = {
                 "computed_qty": computed_qty
             }
