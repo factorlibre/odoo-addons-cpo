@@ -150,7 +150,7 @@ class ComputedPurchaseOrderLine(models.Model):
 
         product_total_qty = product_ids._product_available()
         product_ids._get_draft_outgoing_qty()
-        product_ids._get_draft_outgoing_qty()
+        product_ids._get_draft_incoming_qty()
         for cpol in self:
             if cpol.product_id.id:
                 product_qty = product_total_qty[cpol.product_id.id]
