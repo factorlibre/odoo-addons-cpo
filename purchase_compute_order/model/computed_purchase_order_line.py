@@ -140,16 +140,28 @@ class ComputedPurchaseOrderLine(models.Model):
 
     @api.multi
     def _product_qty_available(self):
+        if not self.mapped("computed_purchase_order_id"):
+            return
+
+        product_ids = self.mapped("product_id")
+        context = self.mapped("computed_purchase_order_id").get_product_context()
+        if context:
+            product_ids = product_ids.with_context(context)
+
+        product_total_qty = product_ids._product_available()
+        product_ids._get_draft_outgoing_qty()
+        product_ids._get_draft_outgoing_qty()
         for cpol in self:
             if cpol.product_id.id:
-                product_id = cpol.change_product_context(cpol.product_id)
-                product_qty = product_id._product_available()[product_id.id]
+                product_qty = product_total_qty[cpol.product_id.id]
                 cpol.write({
                     'qty_available': product_qty['qty_available'],
                     'outgoing_qty': product_qty['outgoing_qty'],
                     'incoming_qty': product_qty['incoming_qty'],
-                    'draft_incoming_qty': product_id.draft_incoming_qty,
-                    'draft_outgoing_qty': product_id.draft_outgoing_qty,
+                    'draft_incoming_qty': product_ids.filtered(
+                        lambda p: p.id == cpol.product_id.id).draft_incoming_qty,
+                    'draft_outgoing_qty': product_ids.filtered(
+                        lambda p: p.id == cpol.product_id.id).draft_outgoing_qty,
                 })
 
     @api.multi

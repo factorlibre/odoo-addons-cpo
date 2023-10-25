@@ -23,7 +23,8 @@ class ProductProduct(models.Model):
                           datetime.timedelta(days=365)).strftime('%Y-%m-%d')
             date = max(begin_date, product._min_date_draft())
             sale_ids = self.env['sale.order'].search([
-                ('date_order', '>=', date)
+                ('date_order', '>=', date),
+                ('state', 'in', parametres),
             ]).ids
             domain = self._get_average_consumption_domain(parametres, sale_ids)
             line_ids = self.env['sale.order.line'].search(domain)
@@ -46,12 +47,14 @@ class ProductProduct(models.Model):
         if True in pvi:
             sale_ids += self.env['sale.order'].search([
                 ('date_order', '>=', date),
-                ('initial_order', '=', True)
+                ('initial_order', '=', True),
+                ('state', 'in', parametres),
             ]).ids
         if False in pvi:
             sale_ids += self.env['sale.order'].search([
                 ('date_order', '>=', date),
-                ('initial_order', '=', False)
+                ('initial_order', '=', False),
+                ('state', 'in', parametres),
             ]).ids
         domain = self._get_average_consumption_domain(parametres, sale_ids)
         line_ids = self.env['sale.order.line'].search(domain)
@@ -106,9 +109,5 @@ class ProductProduct(models.Model):
 
     @api.multi
     def _get_average_consumption_domain(self, parametres, sale_ids):
-        sale_ids = self.env['sale.order'].search([
-            ('id', 'in', sale_ids),
-            ('state', 'in', parametres),
-        ]).ids
         return [('order_id', 'in', sale_ids),
                 ('product_id', '=', self.id)]

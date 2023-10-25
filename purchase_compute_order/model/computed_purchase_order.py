@@ -583,3 +583,7 @@ class ComputedPurchaseOrder(models.Model):
     def get_product_average_consumption(self, product_id):
         self.ensure_one()
         return product_id.average_consumption
+
+    @api.multi
+    def get_product_context(self):
+        return {}
