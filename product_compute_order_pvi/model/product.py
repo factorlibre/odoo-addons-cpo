@@ -124,12 +124,14 @@ class ProductProduct(models.Model):
 
     @api.multi
     def _get_pvi_outgoing_product_qty_domain(self):
+        one_year_ago = datetime.datetime.now() - datetime.timedelta(days=365)
         sale_ids = (
             self.env["sale.order"]
             .search(
                 [
                     ("initial_order", "=", True),
                     ("state", "in", ["draft", "sent"]),
+                    ("date_order", ">=", one_year_ago.strftime("%Y-%m-%d")),
                 ]
             )
             .ids
