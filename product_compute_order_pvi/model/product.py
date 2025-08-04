@@ -6,64 +6,86 @@ import time
 
 
 class ProductProduct(models.Model):
-    _inherit = 'product.product'
+    _inherit = "product.product"
 
-    average_consumption_pvi = fields.Float("Average Consumption with PVI",
-                                           compute='_average_consumption_pvi')
+    average_consumption_pvi = fields.Float(
+        "Average Consumption with PVI", compute="_average_consumption_pvi"
+    )
 
     @api.multi
     def _average_consumption_pvi(self):
-        parametres = ['draft', 'pvi_confirmed', 'sent']
+        parametres = ["draft", "pvi_confirmed", "sent"]
         self.calculate_average_consumption_pvi(parametres)
 
     @api.multi
     def calculate_average_consumption_pvi(self, parametres):
         for product in self:
-            begin_date = (datetime.datetime.today() -
-                          datetime.timedelta(days=365)).strftime('%Y-%m-%d')
-            date = max(begin_date, product._min_date_draft())
-            sale_ids = self.env['sale.order'].search([
-                ('date_order', '>=', date),
-                ('state', 'in', parametres),
-            ]).ids
+            begin_date = (
+                datetime.datetime.today() - datetime.timedelta(days=365)
+            ).strftime("%Y-%m-%d")
+            dates_to_consider = [begin_date, self._min_date_draft()]
+            # Incluir date_start del contexto si existe
+            context_date_start = product.env.context.get("date_start")
+            if context_date_start:
+                dates_to_consider.append(context_date_start)
+            date = max(dates_to_consider)
+            sale_ids = (
+                self.env["sale.order"]
+                .search(
+                    [
+                        ("date_order", ">=", date),
+                        ("state", "in", parametres),
+                    ]
+                )
+                .ids
+            )
             domain = self._get_average_consumption_domain(parametres, sale_ids)
-            line_ids = self.env['sale.order.line'].search(domain)
+            line_ids = self.env["sale.order.line"].search(domain)
             consumption = 0
-            nb_days = (datetime.datetime.today() -
-                       datetime.datetime.strptime(
-                       min(product._min_date(), date), '%Y-%m-%d')).days or 1.0
+            nb_days = (
+                datetime.datetime.today()
+                - datetime.datetime.strptime(min(product._min_date(), date), "%Y-%m-%d")
+            ).days or 1.0
             for line in line_ids:
                 consumption += line.product_uom_qty
-            product.average_consumption_pvi =\
-                (consumption + product.total_consumption) / nb_days
+            product.average_consumption_pvi = (
+                consumption + product.total_consumption
+            ) / nb_days
 
     @api.multi
     def custom_average_consumption(self, parametres, pvi):
         self.ensure_one()
-        begin_date = (datetime.datetime.today() -
-                      datetime.timedelta(days=365)).strftime('%Y-%m-%d')
-        date = max(begin_date, self._min_date_draft())
-        sale_ids = []
-        if True in pvi:
-            sale_ids += self.env['sale.order'].search([
-                ('date_order', '>=', date),
-                ('initial_order', '=', True),
-                ('state', 'in', parametres),
-            ]).ids
-        if False in pvi:
-            sale_ids += self.env['sale.order'].search([
-                ('date_order', '>=', date),
-                ('initial_order', '=', False),
-                ('state', 'in', parametres),
-            ]).ids
-        domain = self._get_average_consumption_domain(parametres, sale_ids)
-        line_ids = self.env['sale.order.line'].search(domain)
+        begin_date = (
+            datetime.datetime.today() - datetime.timedelta(days=365)
+        ).strftime("%Y-%m-%d")
+
+        # Obtener fechas a considerar para el max, incluyendo date_start del contexto
+        dates_to_consider = [begin_date, self._min_date_draft()]
+
+        # Incluir date_start del contexto si existe
+        context_date_start = self.env.context.get("date_start")
+        if context_date_start:
+            dates_to_consider.append(context_date_start)
+
+        date = max(dates_to_consider)
+        sale_domain = [
+            ("date_order", ">=", date),
+            ("state", "in", parametres),
+        ]
+        if True in pvi and False not in pvi:
+            sale_domain.append(("initial_order", "=", True))
+        elif False in pvi:
+            sale_domain.append(("initial_order", "=", False))
+        sale_orders = self.env["sale.order"].search(sale_domain)
+        domain = self._get_average_consumption_domain(parametres, sale_orders.ids)
+        line_ids = self.env["sale.order.line"].search(domain)
         consumption = 0
-        nb_days = (datetime.datetime.today() -
-                   datetime.datetime.strptime(
-                   min(self._min_date(), date), '%Y-%m-%d')).days or 1.0
+        nb_days = (
+            datetime.datetime.today()
+            - datetime.datetime.strptime(min(self._min_date(), date), "%Y-%m-%d")
+        ).days or 1.0
         for line in line_ids:
-            if line.order_id.state == 'pvi_confirmed':
+            if line.order_id.state == "pvi_confirmed":
                 consumption += line.uom_remaining_qty
             else:
                 consumption += line.product_uom_qty
@@ -76,38 +98,46 @@ class ProductProduct(models.Model):
                 from sale_order as so
                 inner join sale_order_line as sol
                     on so.id = sol.order_id
-                where sol.product_id = %s""" % (self.id)
+                where sol.product_id = %s""" % (
+            self.id
+        )
         self.env.cr.execute(query)
         results = self.env.cr.fetchall()
-        return results and results[0] and results[0][0] \
-            or time.strftime('%Y-%m-%d')
+        return results and results[0] and results[0][0] or time.strftime("%Y-%m-%d")
 
     @api.multi
     def _get_draft_outgoing_qty(self):
         super(ProductProduct, self)._get_draft_outgoing_qty()
-        sol_obj = self.env['sale.order.line']
+        sol_obj = self.env["sale.order.line"]
         domain = self._get_pvi_outgoing_product_qty_domain()
         sol_ids = sol_obj.search(domain)
         draft_qty = {}
         for line in sol_ids:
             draft_qty.setdefault(line.product_id.id, 0)
-            draft_qty[line.product_id.id] += \
-                line.product_uom_qty / line.product_uom.factor\
+            draft_qty[line.product_id.id] += (
+                line.product_uom_qty
+                / line.product_uom.factor
                 * line.product_id.uom_id.factor
+            )
         for pp in self:
             pp.draft_outgoing_qty -= draft_qty.get(pp.id, 0)
 
-
     @api.multi
     def _get_pvi_outgoing_product_qty_domain(self):
-        sale_ids = self.env['sale.order'].search([
-            ('initial_order', '=', True),
-            ('state', 'in', ['draft', 'sent']),
-        ]).ids
-        return [('order_id', 'in', sale_ids),
-                ('product_id', 'in', self.ids)]
+        one_year_ago = datetime.datetime.now() - datetime.timedelta(days=365)
+        sale_ids = (
+            self.env["sale.order"]
+            .search(
+                [
+                    ("initial_order", "=", True),
+                    ("state", "in", ["draft", "sent"]),
+                    ("date_order", ">=", one_year_ago.strftime("%Y-%m-%d")),
+                ]
+            )
+            .ids
+        )
+        return [("order_id", "in", sale_ids), ("product_id", "in", self.ids)]
 
     @api.multi
     def _get_average_consumption_domain(self, parametres, sale_ids):
-        return [('order_id', 'in', sale_ids),
-                ('product_id', '=', self.id)]
+        return [("order_id", "in", sale_ids), ("product_id", "=", self.id)]
