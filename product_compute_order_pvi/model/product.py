@@ -54,15 +54,15 @@ class ProductProduct(models.Model):
 
     @api.multi
     def custom_average_consumption(self, parametres, pvi):
+        """
+        Versión ultra optimizada con search_read para eliminar bucles Python
+        """
         self.ensure_one()
         begin_date = (
             datetime.datetime.today() - datetime.timedelta(days=365)
         ).strftime("%Y-%m-%d")
 
-        # Obtener fechas a considerar para el max, incluyendo date_start del contexto
         dates_to_consider = [begin_date, self._min_date_draft()]
-
-        # Incluir date_start del contexto si existe
         context_date_start = self.env.context.get("date_start")
         if context_date_start:
             dates_to_consider.append(context_date_start)
@@ -74,21 +74,74 @@ class ProductProduct(models.Model):
         ]
         if True in pvi and False not in pvi:
             sale_domain.append(("initial_order", "=", True))
-        elif False in pvi:
+        elif False in pvi and True not in pvi:
             sale_domain.append(("initial_order", "=", False))
-        sale_orders = self.env["sale.order"].search(sale_domain)
-        domain = self._get_average_consumption_domain(parametres, sale_orders.ids)
-        line_ids = self.env["sale.order.line"].search(domain)
+
+        # OPTIMIZACIÓN 1: Usar search_read para sale_orders
+        sale_orders_data = self.env["sale.order"].search_read(
+            domain=sale_domain,
+            fields=['id', 'state']
+        )
+
+        if not sale_orders_data:
+            return [0, 0]
+
+        sale_order_ids = [order['id'] for order in sale_orders_data]
+        order_states = {order['id']: order['state'] for order in sale_orders_data}
+
+        # OPTIMIZACIÓN 2: Separar condiciones del dominio original
+        original_domain = self._get_average_consumption_domain(parametres, sale_order_ids)
+
+        sale_order_conditions = []
+        sale_line_conditions = []
+
+        for condition in original_domain:
+            if len(condition) == 3:
+                field, operator, value = condition
+                if '.' in field and field.startswith('order_id.'):
+                    sale_order_field = field.replace('order_id.', '')
+                    sale_order_conditions.append((sale_order_field, operator, value))
+                else:
+                    sale_line_conditions.append(condition)
+            else:
+                sale_line_conditions.append(condition)
+
+        # OPTIMIZACIÓN 3: Filtrar sale_orders si hay condiciones JOIN
+        if sale_order_conditions:
+            filtered_orders_data = self.env["sale.order"].search_read(
+                domain=[('id', 'in', sale_order_ids)] + sale_order_conditions,
+                fields=['id', 'state']
+            )
+            sale_order_ids = [order['id'] for order in filtered_orders_data]
+            order_states = {order['id']: order['state'] for order in filtered_orders_data}
+
+        if not sale_order_ids:
+            return [0, 0]
+
+        # OPTIMIZACIÓN 4: search_read para sale_order_line (sin JOINs)
+        optimized_domain = [('order_id', 'in', sale_order_ids)] + sale_line_conditions
+
+        lines_data = self.env["sale.order.line"].search_read(
+            domain=optimized_domain,
+            fields=['product_uom_qty', 'uom_remaining_qty', 'order_id']
+        )
+
+        # OPTIMIZACIÓN 5: Calcular consumo sin bucle de objetos ORM
         consumption = 0
         nb_days = (
             datetime.datetime.today()
             - datetime.datetime.strptime(min(self._min_date(), date), "%Y-%m-%d")
         ).days or 1.0
-        for line in line_ids:
-            if line.order_id.state == "pvi_confirmed":
-                consumption += line.uom_remaining_qty
+
+        for line_data in lines_data:
+            order_id = line_data['order_id'][0] if line_data['order_id'] else None
+            order_state = order_states.get(order_id, '')
+
+            if order_state == "pvi_confirmed":
+                consumption += line_data['uom_remaining_qty'] or 0
             else:
-                consumption += line.product_uom_qty
+                consumption += line_data['product_uom_qty'] or 0
+
         return [consumption, (consumption / nb_days)]
 
     @api.multi
