@@ -21,7 +21,6 @@
 #
 ##############################################################################
 from openerp import models, api
-from datetime import datetime, timedelta
 
 
 class ProductProduct(models.Model):
@@ -33,7 +32,6 @@ class ProductProduct(models.Model):
         super(ProductProduct, self)._get_draft_outgoing_qty()
         domain = self._get_outgoing_product_qty_domain()
         sol_obj = self.env['sale.order.line']
-        domain = self.transform_domain(domain)
         sol_ids = sol_obj.search(domain)
         draft_qty = {}
         for line in sol_ids:
@@ -49,25 +47,3 @@ class ProductProduct(models.Model):
         return [
             ('order_id.state', 'in', ['draft', 'sent']),
             ('product_id', 'in', self.ids)]
-
-    def transform_domain(self, domain):
-        sale_order_domain = []
-        sale_order_line_domain = []
-        for condition in domain:
-            if condition[0].startswith("order_id."):
-                # Condición para sale.order
-                sale_order_domain.append((condition[0][9:],) + condition[1:])
-            else:
-                # Condición para sale.order.line
-                sale_order_line_domain.append(condition)
-        # Realizar la búsqueda de sale.order
-        if sale_order_domain:
-            # Añadir filtro de últimos 2 años
-            one_year_ago = datetime.now() - timedelta(days=365)
-            sale_order_domain.append(
-                ("date_order", ">=", one_year_ago.strftime("%Y-%m-%d"))
-            )
-            sale_ids = self.env["sale.order"].search(sale_order_domain)
-            # Añadir la condición de order_id a sale_order_line_domain
-            sale_order_line_domain.append(("order_id", "in", sale_ids.ids))
-        return sale_order_line_domain
