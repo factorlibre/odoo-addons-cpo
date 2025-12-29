@@ -24,9 +24,11 @@ class ComputedPurchaseOrder(models.Model):
     @api.multi
     def _active_product_stock_product_domain(self, psi_ids):
         self.ensure_one()
+        product_env = self.env['product.product']
         product_domain = super(ComputedPurchaseOrder, self).\
             _active_product_stock_product_domain(psi_ids)
-        product_domain.append(('type_pack_calculation', '!=', 'components'))
+        if hasattr(product_env, 'type_pack_calculation'):
+            product_domain.append(('type_pack_calculation', '!=', 'components'))
         if self.product_state_ids and self.filter_by_product_state:
             if ('state', 'not in', ('end', 'obsolete')) in product_domain:
                 product_domain.remove(('state', 'not in', ('end', 'obsolete')))
