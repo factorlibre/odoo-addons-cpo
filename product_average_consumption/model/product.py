@@ -171,9 +171,10 @@ class ProductProduct(models.Model):
                         )
                     if ctx.get("from_date"):
                         first_date = ctx["from_date"]
-                nb_days = (
-                    last_date - datetime.datetime.strptime(first_date, "%Y-%m-%d")
-                ).days or 1.0
+                nb_days = min(
+                    (last_date - datetime.datetime.strptime(first_date, "%Y-%m-%d")).days or 1.0,
+                    365
+                )
                 average_consumption = nb_days and qty_out / nb_days or 0.0
                 total_consumption = qty_out or 0.0
                 if total_consumption == 0:
